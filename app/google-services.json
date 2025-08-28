@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "829847189130",
+    "project_id": "hybridchat-f9776",
+    "storage_bucket": "hybridchat-f9776.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:829847189130:android:5a3873d1496f4e5c7a1f73",
+        "android_client_info": {
+          "package_name": "com.andrey.hybridchat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfin4c-qBqARLVPqnOtBOSSmKYbIEh6Ug"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

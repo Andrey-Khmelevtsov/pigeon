@@ -1,0 +1,60 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'com.google.gms.google-services'
+}
+
+android {
+    namespace 'com.andrey.hybridchat'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.andrey.hybridchat"
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = '11'
+    }
+}
+
+dependencies {
+
+    // Стандартные библиотеки Android
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation libs.androidx.activity
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+    // Firebase Bill of Materials (BOM) - управляет версиями всех библиотек Firebase
+    // Это как сказать: "Дай мне все инструменты Firebase, которые точно совместимы друг с другом"
+    implementation platform('com.google.firebase:firebase-bom:33.1.0')
+
+    // Наши инструменты Firebase:
+    // 1. Для аутентификации (вход и регистрация)
+    implementation 'com.google.firebase:firebase-auth'
+    // 2. Для базы данных Cloud Firestore
+    implementation 'com.google.firebase:firebase-firestore'
+
+    // Инструмент для асинхронных задач (чтобы приложение не тормозило при запросах в сеть)
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+}
