@@ -40,7 +40,7 @@ class ChatActivity : AppCompatActivity() {
         setContentView(R.layout.activity_chat)
 
         receiverUid = intent.getStringExtra("USER_UID")
-        val receiverEmail = intent.getStringExtra("USER_EMAIL")
+        val receiverName = intent.getStringExtra("USER_NAME")
         senderUid = auth.currentUser?.uid
 
         if (receiverUid != null) {
@@ -49,7 +49,7 @@ class ChatActivity : AppCompatActivity() {
 
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
-        supportActionBar?.title = receiverEmail
+        supportActionBar?.title = receiverName
 
         chatRecyclerView = findViewById(R.id.chatRecyclerView)
         messageEditText = findViewById(R.id.messageEditText)
@@ -87,13 +87,12 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-    // Теперь эта функция принимает и канал отправки
     private fun sendMessageFirestore(messageText: String, channel: String) {
         val message = Message(
             text = messageText,
             senderId = senderUid,
             timestamp = System.currentTimeMillis(),
-            channel = channel // Устанавливаем канал
+            channel = channel
         )
         val chatRoomId = listOfNotNull(senderUid, receiverUid).sorted().joinToString("_")
 
@@ -101,7 +100,6 @@ class ChatActivity : AppCompatActivity() {
             .collection("messages")
             .add(message)
             .addOnSuccessListener {
-                // Очищаем поле ввода только если это не SMS (чтобы не было двойной очистки)
                 if (channel == "firebase") {
                     messageEditText.setText("")
                 }
@@ -117,14 +115,10 @@ class ChatActivity : AppCompatActivity() {
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
             try {
-                // 1. Отправляем реальное SMS
                 val smsManager: SmsManager = SmsManager.getDefault()
                 smsManager.sendTextMessage(phoneNumber, null, messageText, null, null)
                 Toast.makeText(this, "Сообщение отправлено по SMS", Toast.LENGTH_LONG).show()
-
-                // 2. СРАЗУ ЖЕ дублируем его в Firestore
                 sendMessageFirestore(messageText, "sms")
-
                 messageEditText.setText("")
             } catch (e: Exception) {
                 Toast.makeText(this, "Ошибка отправки SMS: ${e.message}", Toast.LENGTH_LONG).show()
@@ -141,7 +135,7 @@ class ChatActivity : AppCompatActivity() {
             .collection("messages")
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshots, error ->
-                if (error != null) { return@addSnapshotListener }
+                if (error != null) { return@addSnapshotListener } // <-- ИСПРАВЛЕНИЕ ЗДЕСЬ
                 if (snapshots != null) {
                     messageList.clear()
                     for (doc in snapshots.documents) {
