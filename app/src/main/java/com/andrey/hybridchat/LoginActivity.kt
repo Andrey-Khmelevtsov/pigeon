@@ -1,5 +1,6 @@
 package com.andrey.hybridchat
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
@@ -20,12 +21,10 @@ class LoginActivity : AppCompatActivity() {
 
         auth = Firebase.auth
 
-        // Находим элементы интерфейса
         val emailEditText: EditText = findViewById(R.id.editTextEmailLogin)
         val passwordEditText: EditText = findViewById(R.id.editTextPasswordLogin)
         val loginButton: Button = findViewById(R.id.buttonLogin)
 
-        // Устанавливаем слушателя на кнопку "Войти"
         loginButton.setOnClickListener {
             val email = emailEditText.text.toString()
             val password = passwordEditText.text.toString()
@@ -35,16 +34,20 @@ class LoginActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // ГЛАВНЫЙ МЕТОД ДЛЯ ВХОДА
             auth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this) { task ->
                     if (task.isSuccessful) {
-                        // Успех
                         Log.d("LoginActivity", "signInWithEmail:success")
                         Toast.makeText(baseContext, "Вход успешен.", Toast.LENGTH_SHORT).show()
-                        // В будущем здесь будет переход на экран со списком чатов
+
+                        // ИЗМЕНЕНИЕ ЗДЕСЬ:
+                        // Создаем намерение открыть UserListActivity
+                        val intent = Intent(this, UserListActivity::class.java)
+                        startActivity(intent)
+                        // Закрываем текущий экран (Login), чтобы пользователь не мог на него вернуться кнопкой "Назад"
+                        finish()
+
                     } else {
-                        // Провал
                         Log.w("LoginActivity", "signInWithEmail:failure", task.exception)
                         Toast.makeText(baseContext, "Ошибка входа: ${task.exception?.message}", Toast.LENGTH_LONG).show()
                     }
