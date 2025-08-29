@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.telephony.SmsManager
+import android.util.Log
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
@@ -32,8 +33,7 @@ class ChatActivity : AppCompatActivity() {
 
     private var receiverUid: String? = null
     private var senderUid: String? = null
-    // Новая переменная для хранения номера телефона собеседника
-    private var receiverPhoneNumber: String? = null // TODO: Пока будет пустым
+    private var receiverPhoneNumber: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,6 +42,10 @@ class ChatActivity : AppCompatActivity() {
         receiverUid = intent.getStringExtra("USER_UID")
         val receiverEmail = intent.getStringExtra("USER_EMAIL")
         senderUid = auth.currentUser?.uid
+
+        if (receiverUid != null) {
+            fetchReceiverPhoneNumber(receiverUid!!)
+        }
 
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
@@ -65,22 +69,31 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
+    private fun fetchReceiverPhoneNumber(uid: String) {
+        db.collection("users").document(uid).get()
+            .addOnSuccessListener { document ->
+                if (document != null) {
+                    receiverPhoneNumber = document.getString("phoneNumber")
+                    Log.d("ChatActivity", "Receiver phone number loaded: $receiverPhoneNumber")
+                }
+            }
+    }
+
     private fun sendMessage(messageText: String) {
-        // === НАША НОВАЯ "УМНАЯ" ЛОГИКА ===
         if (NetworkChecker.isNetworkAvailable(this)) {
-            // Если интернет есть, отправляем через Firestore
-            sendMessageFirestore(messageText)
+            sendMessageFirestore(messageText, "firebase")
         } else {
-            // Если интернета нет, отправляем через SMS
             sendMessageSms(messageText)
         }
     }
 
-    private fun sendMessageFirestore(messageText: String) {
+    // Теперь эта функция принимает и канал отправки
+    private fun sendMessageFirestore(messageText: String, channel: String) {
         val message = Message(
             text = messageText,
             senderId = senderUid,
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis(),
+            channel = channel // Устанавливаем канал
         )
         val chatRoomId = listOfNotNull(senderUid, receiverUid).sorted().joinToString("_")
 
@@ -88,21 +101,30 @@ class ChatActivity : AppCompatActivity() {
             .collection("messages")
             .add(message)
             .addOnSuccessListener {
-                messageEditText.setText("")
+                // Очищаем поле ввода только если это не SMS (чтобы не было двойной очистки)
+                if (channel == "firebase") {
+                    messageEditText.setText("")
+                }
             }
     }
 
     private fun sendMessageSms(messageText: String) {
-        // TODO: Замени на реальный номер для теста, например, свой собственный.
-        // Позже мы будем получать этот номер из профиля пользователя.
-        val phoneNumber = "+79185776814"
+        val phoneNumber = receiverPhoneNumber
+        if (phoneNumber == null) {
+            Toast.makeText(this, "Не удалось найти номер телефона собеседника", Toast.LENGTH_LONG).show()
+            return
+        }
 
-        // Проверяем, есть ли у нас разрешение на отправку SMS
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
             try {
+                // 1. Отправляем реальное SMS
                 val smsManager: SmsManager = SmsManager.getDefault()
                 smsManager.sendTextMessage(phoneNumber, null, messageText, null, null)
                 Toast.makeText(this, "Сообщение отправлено по SMS", Toast.LENGTH_LONG).show()
+
+                // 2. СРАЗУ ЖЕ дублируем его в Firestore
+                sendMessageFirestore(messageText, "sms")
+
                 messageEditText.setText("")
             } catch (e: Exception) {
                 Toast.makeText(this, "Ошибка отправки SMS: ${e.message}", Toast.LENGTH_LONG).show()

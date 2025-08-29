@@ -23,16 +23,23 @@ class RegisterActivity : AppCompatActivity() {
 
         auth = Firebase.auth
 
+        // Находим все четыре поля
+        val usernameEditText: EditText = findViewById(R.id.editTextUsername) // <-- НОВОЕ
         val emailEditText: EditText = findViewById(R.id.editTextEmail)
+        val phoneEditText: EditText = findViewById(R.id.editTextPhone)
         val passwordEditText: EditText = findViewById(R.id.editTextPassword)
         val registerButton: Button = findViewById(R.id.buttonRegister)
 
         registerButton.setOnClickListener {
+            // Считываем данные из всех полей
+            val username = usernameEditText.text.toString() // <-- НОВОЕ
             val email = emailEditText.text.toString()
+            val phone = phoneEditText.text.toString()
             val password = passwordEditText.text.toString()
 
-            if (email.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, "Пожалуйста, введите e-mail и пароль.", Toast.LENGTH_SHORT).show()
+            // Добавляем проверку для имени
+            if (username.isEmpty() || email.isEmpty() || phone.isEmpty() || password.isEmpty()) { // <-- ИЗМЕНЕНО
+                Toast.makeText(this, "Пожалуйста, заполните все поля.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
@@ -41,19 +48,17 @@ class RegisterActivity : AppCompatActivity() {
                     if (task.isSuccessful) {
                         Log.d("RegisterActivity", "createUserWithEmail:success")
 
-                        // ----- НОВЫЙ КОД ЗДЕСЬ -----
-                        // После успешной регистрации в Auth, создаем запись в Firestore
                         val firebaseUser = auth.currentUser
                         val userId = firebaseUser?.uid
 
                         if (userId != null) {
-                            val user = User(uid = userId, email = email)
+                            // При создании объекта User теперь передаем и имя
+                            val user = User(uid = userId, username = username, email = email, phoneNumber = phone) // <-- ИЗМЕНЕНО
                             db.collection("users").document(userId)
                                 .set(user)
                                 .addOnSuccessListener { Log.d("RegisterActivity", "User profile created in Firestore") }
                                 .addOnFailureListener { e -> Log.w("RegisterActivity", "Error creating user profile", e) }
                         }
-                        // ----- КОНЕЦ НОВОГО КОДА -----
 
                         Toast.makeText(baseContext, "Регистрация успешна!", Toast.LENGTH_SHORT).show()
                     } else {
