@@ -1,5 +1,9 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Base.Theme.HybridChat" parent="Theme.Material3.DayNight.NoActionBar">
+
+        <item name="colorPrimary">#606E8C</item>
+        <item name="colorPrimaryVariant">#4a5672</item>
+
     </style>
 
     <style name="Theme.HybridChat" parent="Base.Theme.HybridChat" />
