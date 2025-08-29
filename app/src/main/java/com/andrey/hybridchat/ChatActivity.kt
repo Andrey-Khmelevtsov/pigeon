@@ -1,14 +1,19 @@
 package com.andrey.hybridchat
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.telephony.SmsManager
 import android.widget.Button
 import android.widget.EditText
+import android.widget.Toast
 import androidx.appcompat.widget.Toolbar
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.andrey.hybridchat.models.Message
-import com.andrey.hybridchat.models.User
+import com.andrey.hybridchat.utils.NetworkChecker
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
@@ -27,35 +32,31 @@ class ChatActivity : AppCompatActivity() {
 
     private var receiverUid: String? = null
     private var senderUid: String? = null
+    // Новая переменная для хранения номера телефона собеседника
+    private var receiverPhoneNumber: String? = null // TODO: Пока будет пустым
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
 
-        // Получаем UID'ы отправителя и получателя
         receiverUid = intent.getStringExtra("USER_UID")
         val receiverEmail = intent.getStringExtra("USER_EMAIL")
         senderUid = auth.currentUser?.uid
 
-        // Настраиваем Toolbar
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
         supportActionBar?.title = receiverEmail
 
-        // Находим View-элементы
         chatRecyclerView = findViewById(R.id.chatRecyclerView)
         messageEditText = findViewById(R.id.messageEditText)
         sendButton = findViewById(R.id.sendButton)
 
-        // Настраиваем RecyclerView
         messageAdapter = MessageAdapter(messageList)
         chatRecyclerView.layoutManager = LinearLayoutManager(this)
         chatRecyclerView.adapter = messageAdapter
 
-        // Загружаем сообщения
         loadMessages()
 
-        // Устанавливаем слушателя на кнопку "Send"
         sendButton.setOnClickListener {
             val messageText = messageEditText.text.toString()
             if (messageText.isNotEmpty()) {
@@ -65,52 +66,67 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun sendMessage(messageText: String) {
-        // Создаем объект сообщения
+        // === НАША НОВАЯ "УМНАЯ" ЛОГИКА ===
+        if (NetworkChecker.isNetworkAvailable(this)) {
+            // Если интернет есть, отправляем через Firestore
+            sendMessageFirestore(messageText)
+        } else {
+            // Если интернета нет, отправляем через SMS
+            sendMessageSms(messageText)
+        }
+    }
+
+    private fun sendMessageFirestore(messageText: String) {
         val message = Message(
             text = messageText,
             senderId = senderUid,
             timestamp = System.currentTimeMillis()
         )
-
-        // Создаем уникальный ID для чат-комнаты, чтобы он был одинаковым для обоих пользователей
         val chatRoomId = listOfNotNull(senderUid, receiverUid).sorted().joinToString("_")
 
-        // Сохраняем сообщение в Firestore
         db.collection("chats").document(chatRoomId)
             .collection("messages")
             .add(message)
             .addOnSuccessListener {
-                // Очищаем поле ввода после успешной отправки
                 messageEditText.setText("")
             }
     }
 
+    private fun sendMessageSms(messageText: String) {
+        // TODO: Замени на реальный номер для теста, например, свой собственный.
+        // Позже мы будем получать этот номер из профиля пользователя.
+        val phoneNumber = "+79185776814"
+
+        // Проверяем, есть ли у нас разрешение на отправку SMS
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                val smsManager: SmsManager = SmsManager.getDefault()
+                smsManager.sendTextMessage(phoneNumber, null, messageText, null, null)
+                Toast.makeText(this, "Сообщение отправлено по SMS", Toast.LENGTH_LONG).show()
+                messageEditText.setText("")
+            } catch (e: Exception) {
+                Toast.makeText(this, "Ошибка отправки SMS: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        } else {
+            Toast.makeText(this, "Нет разрешения на отправку SMS", Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun loadMessages() {
-        // Создаем уникальный ID для чат-комнаты
         val chatRoomId = listOfNotNull(senderUid, receiverUid).sorted().joinToString("_")
 
-        // Устанавливаем "слушателя" на коллекцию сообщений в реальном времени
         db.collection("chats").document(chatRoomId)
             .collection("messages")
-            .orderBy("timestamp", Query.Direction.ASCENDING) // Сортируем по времени
+            .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshots, error ->
-                if (error != null) {
-                    // Обработка ошибки
-                    return@addSnapshotListener
-                }
-
+                if (error != null) { return@addSnapshotListener }
                 if (snapshots != null) {
-                    messageList.clear() // Очищаем старый список
-                    // Добавляем все новые сообщения в список
+                    messageList.clear()
                     for (doc in snapshots.documents) {
                         val message = doc.toObject(Message::class.java)
-                        if (message != null) {
-                            messageList.add(message)
-                        }
+                        if (message != null) { messageList.add(message) }
                     }
-                    // Сообщаем адаптеру, что данные обновились
                     messageAdapter.notifyDataSetChanged()
-                    // Прокручиваем список к последнему сообщению
                     chatRecyclerView.scrollToPosition(messageList.size - 1)
                 }
             }

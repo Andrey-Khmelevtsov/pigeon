@@ -1,14 +1,18 @@
 package com.andrey.hybridchat
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.andrey.hybridchat.models.User
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import com.andrey.hybridchat.models.User
 
 class UserListActivity : AppCompatActivity() {
 
@@ -16,49 +20,71 @@ class UserListActivity : AppCompatActivity() {
     private val auth = Firebase.auth
     private lateinit var userAdapter: UserAdapter
     private val userList = mutableListOf<User>()
+    // Код-запрос для разрешений, может быть любым числом
+    private val SMS_PERMISSION_REQUEST_CODE = 101
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_user_list)
 
-        // 1. Находим наш RecyclerView в макете
         val userRecyclerView: RecyclerView = findViewById(R.id.userRecyclerView)
-
-        // 2. Настраиваем RecyclerView:
-        //    - Создаем адаптер с пока еще пустым списком
         userAdapter = UserAdapter(userList)
-        //    - Устанавливаем LayoutManager, который говорит, как располагать элементы (просто списком)
         userRecyclerView.layoutManager = LinearLayoutManager(this)
-        //    - Подключаем наш адаптер к RecyclerView
         userRecyclerView.adapter = userAdapter
 
-        // 3. Вызываем функцию для загрузки пользователей
-        fetchUsers()
+        // Проверяем и запрашиваем разрешения
+        checkAndRequestSmsPermissions()
+    }
+
+    private fun checkAndRequestSmsPermissions() {
+        // Проверяем, есть ли у нас уже нужные разрешения
+        val sendSmsPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
+        val receiveSmsPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS)
+
+        // Если хотя бы одного разрешения нет
+        if (sendSmsPermission != PackageManager.PERMISSION_GRANTED || receiveSmsPermission != PackageManager.PERMISSION_GRANTED) {
+            // Показываем системное диалоговое окно с запросом
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.SEND_SMS, Manifest.permission.RECEIVE_SMS),
+                SMS_PERMISSION_REQUEST_CODE
+            )
+        } else {
+            // Если разрешения уже есть, просто загружаем пользователей
+            fetchUsers()
+        }
+    }
+
+    // Этот метод вызывается после того, как пользователь ответил на запрос разрешений
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == SMS_PERMISSION_REQUEST_CODE) {
+            // Если пользователь дал разрешения (или хотя бы одно из них), загружаем список
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                fetchUsers()
+            } else {
+                // Можно показать сообщение, что без разрешений SMS-режим работать не будет
+                // Но пока просто загружаем пользователей в любом случае
+                fetchUsers()
+            }
+        }
     }
 
     private fun fetchUsers() {
-        // 4. Обращаемся к коллекции "users" в Firestore
         db.collection("users")
             .get()
             .addOnSuccessListener { result ->
-                // 5. В случае успеха, очищаем старый список (на всякий случай)
                 userList.clear()
-                // 6. Проходим по каждому документу, который мы получили
                 for (document in result) {
-                    // 7. Превращаем документ в наш объект класса User
                     val user = document.toObject(User::class.java)
-
-                    // 8. ВАЖНО: Добавляем пользователя в список, только если это не мы сами
                     if (user.uid != auth.currentUser?.uid) {
                         userList.add(user)
                     }
                 }
-                // 9. Сообщаем адаптеру, что данные изменились, и ему нужно перерисовать список
                 userAdapter.notifyDataSetChanged()
                 Log.d("UserListActivity", "Users loaded: ${userList.size}")
             }
             .addOnFailureListener { exception ->
-                // В случае ошибки, выводим ее в лог
                 Log.w("UserListActivity", "Error getting documents: ", exception)
             }
     }
