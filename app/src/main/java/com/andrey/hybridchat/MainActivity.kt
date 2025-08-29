@@ -10,10 +10,17 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        val toLoginButton: Button = findViewById(R.id.toLoginButton)
         val toRegisterButton: Button = findViewById(R.id.toRegisterButton)
 
+        // Слушатель для кнопки "Войти"
+        toLoginButton.setOnClickListener {
+            val intent = Intent(this, LoginActivity::class.java)
+            startActivity(intent)
+        }
+
+        // Слушатель для кнопки "Регистрация"
         toRegisterButton.setOnClickListener {
-            // "Намерение" запустить RegisterActivity
             val intent = Intent(this, RegisterActivity::class.java)
             startActivity(intent)
         }
