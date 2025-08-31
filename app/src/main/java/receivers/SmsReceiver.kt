@@ -22,52 +22,52 @@ class SmsReceiver : BroadcastReceiver() {
                 val senderNum = sms.originatingAddress
                 val messageText = sms.messageBody
 
-                if (senderNum != null) {
+                senderNum?.let {
                     // Если номер отправителя есть, ищем его в нашей базе
-                    findUserByPhoneNumber(senderNum, messageText)
+                    findUserByPhoneNumber(it, messageText)
                 }
             }
         }
     }
 
     private fun findUserByPhoneNumber(phoneNumber: String, messageText: String) {
-        // Ищем в коллекции "users" документ, где поле "phoneNumber" равно номеру отправителя
         db.collection("users")
             .whereEqualTo("phoneNumber", phoneNumber)
             .get()
             .addOnSuccessListener { documents ->
                 if (!documents.isEmpty) {
-                    // Пользователь найден!
-                    val senderUser = documents.first() // Берем первого найденного
+                    val senderUser = documents.first()
                     val senderId = senderUser.getString("uid")
                     val ourUserId = auth.currentUser?.uid
 
-                    if (senderId != null && ourUserId != null) {
-                        saveSmsToChat(senderId, ourUserId, messageText)
+                    // ИЗМЕНЕНИЕ 1: Заменил if (.. != null) на безопасный и идиоматичный let
+                    senderId?.let { safeSenderId ->
+                        ourUserId?.let { safeOurUserId ->
+                            saveSmsToChat(safeSenderId, safeOurUserId, messageText)
+                        }
                     }
                 } else {
-                    Log.d("SmsReceiver", "No user found with phone number: $phoneNumber")
+                    Log.d("SmsReceiver", "Пользователь с номером $phoneNumber не найден в базе.")
                 }
             }
     }
 
     private fun saveSmsToChat(senderId: String, receiverId: String, messageText: String) {
-        // Создаем ID комнаты чата (точно так же, как в ChatActivity)
         val chatRoomId = listOf(senderId, receiverId).sorted().joinToString("_")
 
-        // Создаем объект сообщения
+        // ИЗМЕНЕНИЕ 2: Добавил receiverId в объект Message, это критически важно
         val message = Message(
             text = messageText,
             senderId = senderId,
+            receiverId = receiverId, // Это поле было пропущено
             timestamp = System.currentTimeMillis()
         )
 
-        // Сохраняем сообщение в нужный чат в Firestore
         db.collection("chats").document(chatRoomId)
             .collection("messages")
             .add(message)
             .addOnSuccessListener {
-                Log.d("SmsReceiver", "SMS from $senderId saved to chat $chatRoomId")
+                Log.d("SmsReceiver", "SMS от $senderId сохранено в чат $chatRoomId")
             }
     }
 }
