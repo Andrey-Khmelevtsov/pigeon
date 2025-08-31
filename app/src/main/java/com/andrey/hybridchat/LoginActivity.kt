@@ -9,7 +9,10 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.messaging.FirebaseMessaging
 
 class LoginActivity : AppCompatActivity() {
 
@@ -40,12 +43,46 @@ class LoginActivity : AppCompatActivity() {
                         Log.d("LoginActivity", "signInWithEmail:success")
                         Toast.makeText(baseContext, "Вход успешен.", Toast.LENGTH_SHORT).show()
 
-                        // ИЗМЕНЕНИЕ ЗДЕСЬ:
-                        // Создаем намерение открыть UserListActivity
-                        val intent = Intent(this, UserListActivity::class.java)
-                        startActivity(intent)
-                        // Закрываем текущий экран (Login), чтобы пользователь не мог на него вернуться кнопкой "Назад"
-                        finish()
+                        // =======================================================
+                        // ============= БЛОК, КОТОРЫЙ Я ДОБАВИЛ ===============
+                        // =======================================================
+                        Log.d("LOGIN_SUCCESS", "Пользователь успешно вошел. Обновляем FCM токен.")
+
+                        FirebaseMessaging.getInstance().token.addOnCompleteListener { tokenTask ->
+                            if (!tokenTask.isSuccessful) {
+                                Log.w("FCM_TOKEN", "Не удалось получить FCM токен.", tokenTask.exception)
+                                // Даже если токен не получили, все равно переходим дальше
+                                navigateToUserList()
+                                return@addOnCompleteListener
+                            }
+
+                            // Получаем токен
+                            val token = tokenTask.result
+                            Log.d("FCM_TOKEN", "Токен принудительно получен: $token")
+
+                            // Сохраняем его в Firestore
+                            val userId = FirebaseAuth.getInstance().currentUser?.uid
+                            if (userId != null) {
+                                val userDocRef = FirebaseFirestore.getInstance().collection("users").document(userId)
+                                userDocRef.set(hashMapOf("fcmToken" to token), SetOptions.merge())
+                                    .addOnSuccessListener {
+                                        Log.d("FCM_TOKEN", "Токен успешно обновлен в Firestore при входе.")
+                                        // Переходим на следующий экран ПОСЛЕ успешного сохранения токена
+                                        navigateToUserList()
+                                    }
+                                    .addOnFailureListener {
+                                        Log.e("FCM_TOKEN", "Ошибка при обновлении токена при входе.")
+                                        // Переходим дальше, даже если сохранить не удалось
+                                        navigateToUserList()
+                                    }
+                            } else {
+                                // Если по какой-то причине нет userId, все равно переходим дальше
+                                navigateToUserList()
+                            }
+                        }
+                        // =======================================================
+                        // ================= КОНЕЦ БЛОКА ========================
+                        // =======================================================
 
                     } else {
                         Log.w("LoginActivity", "signInWithEmail:failure", task.exception)
@@ -53,5 +90,11 @@ class LoginActivity : AppCompatActivity() {
                     }
                 }
         }
+    }
+
+    private fun navigateToUserList() {
+        val intent = Intent(this, UserListActivity::class.java)
+        startActivity(intent)
+        finish() // Закрываем экран входа
     }
 }

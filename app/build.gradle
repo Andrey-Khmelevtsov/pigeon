@@ -55,6 +55,7 @@ dependencies {
     // ↓↓↓ НОВАЯ СТРОКА ДЛЯ AGORA ↓↓↓
     implementation 'io.agora.rtc:voice-sdk:4.2.6'
     implementation libs.androidx.activity
+    implementation libs.firebase.messaging
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
