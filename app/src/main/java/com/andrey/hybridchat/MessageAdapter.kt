@@ -14,88 +14,87 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class MessageAdapter(private val messageList: List<Message>) :
-    RecyclerView.Adapter<MessageAdapter.MessageViewHolder>() {
+class MessageAdapter(private val messageList: List<Message>) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    private val senderUid = Firebase.auth.currentUser?.uid
+    private val ITEM_SENT = 1
+    private val ITEM_RECEIVED = 2
 
-    companion object {
-        private const val MSG_TYPE_SENT = 0
-        private const val MSG_TYPE_RECEIVED = 1
+    // ViewHolder для отправленных
+    class SentViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val messageText: TextView = itemView.findViewById(R.id.sentMessageTextView)
+        val timestampText: TextView = itemView.findViewById(R.id.sentMessageTimestamp)
+        val attachmentImage: ImageView = itemView.findViewById(R.id.sentAttachmentImageView)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MessageViewHolder {
-        return if (viewType == MSG_TYPE_SENT) {
-            val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_sent_message, parent, false)
-            MessageViewHolder(view)
-        } else {
-            val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_received_message, parent, false)
-            MessageViewHolder(view)
-        }
+    // ViewHolder для полученных
+    class ReceivedViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val messageText: TextView = itemView.findViewById(R.id.receivedMessageTextView)
+        val timestampText: TextView = itemView.findViewById(R.id.receivedMessageTimestamp)
+        val attachmentImage: ImageView = itemView.findViewById(R.id.receivedAttachmentImageView)
     }
-
-    override fun onBindViewHolder(holder: MessageViewHolder, position: Int) {
-        val message = messageList[position]
-        holder.bind(message)
-    }
-
-    override fun getItemCount(): Int = messageList.size
 
     override fun getItemViewType(position: Int): Int {
-        val message = messageList[position]
-        return if (message.senderId == senderUid) {
-            MSG_TYPE_SENT
+        val currentMessage = messageList[position]
+        return if (Firebase.auth.currentUser?.uid == currentMessage.senderId) {
+            ITEM_SENT
         } else {
-            MSG_TYPE_RECEIVED
+            ITEM_RECEIVED
         }
     }
 
-    inner class MessageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        // Для отправленных сообщений
-        private val sentMessageTextView: TextView? = itemView.findViewById(R.id.sentMessageTextView)
-        private val sentAttachmentImageView: ImageView? = itemView.findViewById(R.id.sentAttachmentImageView)
-        private val sentMessageTimestamp: TextView? = itemView.findViewById(R.id.sentMessageTimestamp) // НОВОЕ!
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        return if (viewType == ITEM_SENT) {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_sent_message, parent, false)
+            SentViewHolder(view)
+        } else {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_received_message, parent, false)
+            ReceivedViewHolder(view)
+        }
+    }
 
-        // Для полученных сообщений
-        private val receivedMessageTextView: TextView? = itemView.findViewById(R.id.receivedMessageTextView)
-        private val receivedAttachmentImageView: ImageView? = itemView.findViewById(R.id.receivedAttachmentImageView)
-        private val receivedMessageTimestamp: TextView? = itemView.findViewById(R.id.receivedMessageTimestamp) // НОВОЕ!
+    override fun getItemCount(): Int {
+        return messageList.size
+    }
 
-        fun bind(message: Message) {
-            val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
-            val formattedTime = sdf.format(Date(message.timestamp))
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        val currentMessage = messageList[position]
+        val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val formattedTime = sdf.format(Date(currentMessage.timestamp))
 
-            if (message.senderId == senderUid) { // Отправленное сообщение
-                sentMessageTextView?.text = message.text
-                sentMessageTimestamp?.text = formattedTime // Устанавливаем время
+        if (holder.itemViewType == ITEM_SENT) {
+            val sentHolder = holder as SentViewHolder
+            sentHolder.timestampText.text = formattedTime
 
-                if (message.attachmentUrl != null && message.attachmentType == "file") {
-                    sentAttachmentImageView?.visibility = View.VISIBLE
-                    Glide.with(itemView.context)
-                        .load(message.attachmentUrl)
-                        .into(sentAttachmentImageView!!)
-                    sentMessageTextView?.visibility = View.GONE // Скрываем текст, если есть файл
-                } else {
-                    sentAttachmentImageView?.visibility = View.GONE
-                    sentMessageTextView?.visibility = View.VISIBLE
-                }
+            // --- НОВАЯ ЛОГИКА ОТОБРАЖЕНИЯ ---
+            if (currentMessage.attachmentUrl != null) {
+                // Если есть вложение - показываем картинку, скрываем текст
+                sentHolder.messageText.visibility = View.GONE
+                sentHolder.attachmentImage.visibility = View.VISIBLE
+                Glide.with(holder.itemView.context)
+                    .load(currentMessage.attachmentUrl)
+                    .into(sentHolder.attachmentImage)
+            } else {
+                // Если вложения нет - показываем текст, скрываем картинку
+                sentHolder.messageText.visibility = View.VISIBLE
+                sentHolder.attachmentImage.visibility = View.GONE
+                sentHolder.messageText.text = currentMessage.text
+            }
 
-            } else { // Полученное сообщение
-                receivedMessageTextView?.text = message.text
-                receivedMessageTimestamp?.text = formattedTime // Устанавливаем время
+        } else { // ITEM_RECEIVED
+            val receivedHolder = holder as ReceivedViewHolder
+            receivedHolder.timestampText.text = formattedTime
 
-                if (message.attachmentUrl != null && message.attachmentType == "file") {
-                    receivedAttachmentImageView?.visibility = View.VISIBLE
-                    Glide.with(itemView.context)
-                        .load(message.attachmentUrl)
-                        .into(receivedAttachmentImageView!!)
-                    receivedMessageTextView?.visibility = View.GONE // Скрываем текст, если есть файл
-                } else {
-                    receivedAttachmentImageView?.visibility = View.GONE
-                    receivedMessageTextView?.visibility = View.VISIBLE
-                }
+            // --- НОВАЯ ЛОГИКА ОТОБРАЖЕНИЯ ---
+            if (currentMessage.attachmentUrl != null) {
+                receivedHolder.messageText.visibility = View.GONE
+                receivedHolder.attachmentImage.visibility = View.VISIBLE
+                Glide.with(holder.itemView.context)
+                    .load(currentMessage.attachmentUrl)
+                    .into(receivedHolder.attachmentImage)
+            } else {
+                receivedHolder.messageText.visibility = View.VISIBLE
+                receivedHolder.attachmentImage.visibility = View.GONE
+                receivedHolder.messageText.text = currentMessage.text
             }
         }
     }
