@@ -102,10 +102,7 @@ class ChatActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_call -> {
-                // Пользователь нажал на кнопку "Позвонить"
-                val intent = Intent(this, CallActivity::class.java) // <-- ИСПРАВЛЕНИЕ ЗДЕСЬ
-
-                // Передаем ID комнаты чата как "канал" для звонка
+                val intent = Intent(this, CallActivity::class.java)
                 intent.putExtra("CHANNEL_ID", chatRoomId)
                 intent.putExtra("USER_NAME", supportActionBar?.title)
                 startActivity(intent)

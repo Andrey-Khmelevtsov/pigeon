@@ -17,9 +17,10 @@ import io.agora.rtc2.RtcEngineConfig
 
 class CallActivity : AppCompatActivity() {
 
-    private val appId = "ТВОЙ AGORA APP ID" // НЕ ЗАБУДЬ ВСТАВИТЬ СВОЙ КЛЮЧ
+    private val appId = "cd84d986dc0f48528c3139c74ece2695" // НЕ ЗАБУДЬ ВСТАВИТЬ СВОЙ КЛЮЧ
     private var channelName: String? = null
     private var token: String? = null
+
 
     private var rtcEngine: RtcEngine? = null
     private val PERMISSION_REQ_ID_RECORD_AUDIO = 22
