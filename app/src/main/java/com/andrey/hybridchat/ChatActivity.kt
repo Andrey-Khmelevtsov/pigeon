@@ -157,9 +157,8 @@ class ChatActivity : AppCompatActivity() {
             attachmentUrl = attachmentUrl,
             attachmentType = attachmentType
         )
-        val chatRoomId = listOfNotNull(senderUid, receiverUid).sorted().joinToString("_")
 
-        db.collection("chats").document(chatRoomId)
+        db.collection("chats").document(chatRoomId!!)
             .collection("messages")
             .add(message)
             .addOnSuccessListener {
@@ -192,9 +191,7 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun loadMessages() {
-        val chatRoomId = listOfNotNull(senderUid, receiverUid).sorted().joinToString("_")
-
-        db.collection("chats").document(chatRoomId)
+        db.collection("chats").document(chatRoomId!!)
             .collection("messages")
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshots, error ->
