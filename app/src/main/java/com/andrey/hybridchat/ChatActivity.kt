@@ -1,14 +1,21 @@
 package com.andrey.hybridchat
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.telephony.SmsManager
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -19,6 +26,7 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.ktx.storage
 
 class ChatActivity : AppCompatActivity() {
 
@@ -27,21 +35,39 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var sendButton: Button
     private lateinit var messageAdapter: MessageAdapter
     private val messageList = mutableListOf<Message>()
-
     private val db = Firebase.firestore
     private val auth = Firebase.auth
-
     private var receiverUid: String? = null
     private var senderUid: String? = null
     private var receiverPhoneNumber: String? = null
+    private lateinit var filePickerLauncher: ActivityResultLauncher<String>
+    private val storage = Firebase.storage
+    private var chatRoomId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
 
+        val attachFileButton: ImageButton = findViewById(R.id.attachFileButton)
+
+        filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) {
+                uploadFile(uri)
+            }
+        }
+
+        attachFileButton.setOnClickListener {
+            if (NetworkChecker.isNetworkAvailable(this)) {
+                filePickerLauncher.launch("*/*")
+            } else {
+                Toast.makeText(this, "Прикрепление файлов доступно только онлайн", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         receiverUid = intent.getStringExtra("USER_UID")
         val receiverName = intent.getStringExtra("USER_NAME")
         senderUid = auth.currentUser?.uid
+        chatRoomId = listOfNotNull(senderUid, receiverUid).sorted().joinToString("_")
 
         if (receiverUid != null) {
             fetchReceiverPhoneNumber(receiverUid!!)
@@ -69,12 +95,47 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.chat_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_call -> {
+                val intent = Intent(this, CallActivity::class.java)
+                intent.putExtra("CHANNEL_ID", chatRoomId)
+                intent.putExtra("USER_NAME", supportActionBar?.title)
+                startActivity(intent)
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun uploadFile(fileUri: Uri) {
+        Toast.makeText(this, "Загрузка файла...", Toast.LENGTH_SHORT).show()
+        val fileName = "uploads/${System.currentTimeMillis()}"
+        val storageRef = storage.reference.child(fileName)
+
+        storageRef.putFile(fileUri)
+            .addOnSuccessListener {
+                storageRef.downloadUrl.addOnSuccessListener { downloadUri ->
+                    Toast.makeText(this, "Файл успешно загружен!", Toast.LENGTH_SHORT).show()
+                    val fileUrl = downloadUri.toString()
+                    sendMessageFirestore("Файл", "firebase", fileUrl, "file")
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Ошибка загрузки файла", Toast.LENGTH_SHORT).show()
+            }
+    }
+
     private fun fetchReceiverPhoneNumber(uid: String) {
         db.collection("users").document(uid).get()
             .addOnSuccessListener { document ->
                 if (document != null) {
                     receiverPhoneNumber = document.getString("phoneNumber")
-                    Log.d("ChatActivity", "Receiver phone number loaded: $receiverPhoneNumber")
                 }
             }
     }
@@ -87,12 +148,14 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-    private fun sendMessageFirestore(messageText: String, channel: String) {
+    private fun sendMessageFirestore(messageText: String, channel: String, attachmentUrl: String? = null, attachmentType: String? = null) {
         val message = Message(
             text = messageText,
             senderId = senderUid,
             timestamp = System.currentTimeMillis(),
-            channel = channel
+            channel = channel,
+            attachmentUrl = attachmentUrl,
+            attachmentType = attachmentType
         )
         val chatRoomId = listOfNotNull(senderUid, receiverUid).sorted().joinToString("_")
 
@@ -100,7 +163,7 @@ class ChatActivity : AppCompatActivity() {
             .collection("messages")
             .add(message)
             .addOnSuccessListener {
-                if (channel == "firebase") {
+                if (attachmentUrl == null) {
                     messageEditText.setText("")
                 }
             }
@@ -135,7 +198,7 @@ class ChatActivity : AppCompatActivity() {
             .collection("messages")
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshots, error ->
-                if (error != null) { return@addSnapshotListener } // <-- ИСПРАВЛЕНИЕ ЗДЕСЬ
+                if (error != null) { return@addSnapshotListener }
                 if (snapshots != null) {
                     messageList.clear()
                     for (doc in snapshots.documents) {
