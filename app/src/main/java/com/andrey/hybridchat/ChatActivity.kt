@@ -113,22 +113,25 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun checkAndRequestStoragePermission() {
+        // Определяем, какое разрешение просить в зависимости от версии Android
         val permissionToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
+            Manifest.permission.READ_MEDIA_IMAGES // Новое для Android 13+
         } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+            Manifest.permission.READ_EXTERNAL_STORAGE // Старое для версий ниже
         }
 
         if (ContextCompat.checkSelfPermission(this, permissionToRequest) != PackageManager.PERMISSION_GRANTED) {
+            // Если разрешения нет, запрашиваем его
             ActivityCompat.requestPermissions(this, arrayOf(permissionToRequest), STORAGE_PERMISSION_REQUEST_CODE)
         } else {
+            // Если разрешение уже есть, сразу открываем галерею
             launchFilePicker()
         }
     }
 
     private fun launchFilePicker() {
         if (NetworkChecker.isNetworkAvailable(this)) {
-            filePickerLauncher.launch("*/*")
+            filePickerLauncher.launch("image/*") // Уточняем, что ищем картинки
         } else {
             Toast.makeText(this, "Прикрепление файлов доступно только онлайн", Toast.LENGTH_SHORT).show()
         }
@@ -138,8 +141,10 @@ class ChatActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == STORAGE_PERMISSION_REQUEST_CODE) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Если разрешение дали, открываем галерею
                 launchFilePicker()
             } else {
+                // Если отказали, показываем сообщение
                 Toast.makeText(this, "Нужно разрешение для доступа к файлам", Toast.LENGTH_SHORT).show()
             }
         }
@@ -158,8 +163,8 @@ class ChatActivity : AppCompatActivity() {
                     sendMessageFirestore("Фото", "firebase", fileUrl, "image")
                 }
             }
-            .addOnFailureListener {
-                Toast.makeText(this, "Ошибка загрузки файла", Toast.LENGTH_SHORT).show()
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Ошибка загрузки файла: ${e.message}", Toast.LENGTH_LONG).show()
             }
     }
 
