@@ -155,4 +155,88 @@ class ChatActivity : AppCompatActivity() {
                 storageRef.downloadUrl.addOnSuccessListener { downloadUri ->
                     Toast.makeText(this, "Файл успешно загружен!", Toast.LENGTH_SHORT).show()
                     val fileUrl = downloadUri.toString()
-                    sendMessageFirestore("Фото", "firebase", fileUrl, "
+                    sendMessageFirestore("Фото", "firebase", fileUrl, "image")
+                }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Ошибка загрузки файла: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun fetchReceiverPhoneNumber(uid: String) {
+        db.collection("users").document(uid).get()
+            .addOnSuccessListener { document ->
+                if (document != null) {
+                    receiverPhoneNumber = document.getString("phoneNumber")
+                }
+            }
+    }
+
+    private fun sendMessage(messageText: String) {
+        if (NetworkChecker.isNetworkAvailable(this)) {
+            sendMessageFirestore(messageText, "firebase")
+        } else {
+            sendMessageSms(messageText)
+        }
+    }
+
+    private fun sendMessageFirestore(messageText: String, channel: String, attachmentUrl: String? = null, attachmentType: String? = null) {
+        val message = Message(
+            text = messageText,
+            senderId = senderUid,
+            timestamp = System.currentTimeMillis(),
+            channel = channel,
+            attachmentUrl = attachmentUrl,
+            attachmentType = attachmentType
+        )
+
+        db.collection("chats").document(chatRoomId!!)
+            .collection("messages")
+            .add(message)
+            .addOnSuccessListener {
+                if (attachmentUrl == null) {
+                    messageEditText.setText("")
+                }
+            }
+    }
+
+    private fun sendMessageSms(messageText: String) {
+        val phoneNumber = receiverPhoneNumber
+        if (phoneNumber == null) {
+            Toast.makeText(this, "Не удалось найти номер телефона собеседника", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                val smsManager: SmsManager = SmsManager.getDefault()
+                smsManager.sendTextMessage(phoneNumber, null, messageText, null, null)
+                Toast.makeText(this, "Сообщение отправлено по SMS", Toast.LENGTH_LONG).show()
+                sendMessageFirestore(messageText, "sms")
+                messageEditText.setText("")
+            } catch (e: Exception) {
+                Toast.makeText(this, "Ошибка отправки SMS: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        } else {
+            Toast.makeText(this, "Нет разрешения на отправку SMS", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun loadMessages() {
+        db.collection("chats").document(chatRoomId!!)
+            .collection("messages")
+            .orderBy("timestamp", Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshots, error ->
+                if (error != null) { return@addSnapshotListener }
+                if (snapshots != null) {
+                    messageList.clear()
+                    for (doc in snapshots.documents) {
+                        val message = doc.toObject(Message::class.java)
+                        if (message != null) { messageList.add(message) }
+                    }
+                    messageAdapter.notifyDataSetChanged()
+                    chatRecyclerView.scrollToPosition(messageList.size - 1)
+                }
+            }
+    }
+}
