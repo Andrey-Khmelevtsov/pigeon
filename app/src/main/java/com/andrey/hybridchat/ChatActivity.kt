@@ -113,25 +113,22 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun checkAndRequestStoragePermission() {
-        // Определяем, какое разрешение просить в зависимости от версии Android
         val permissionToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES // Новое для Android 13+
+            Manifest.permission.READ_MEDIA_IMAGES
         } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE // Старое для версий ниже
+            Manifest.permission.READ_EXTERNAL_STORAGE
         }
 
         if (ContextCompat.checkSelfPermission(this, permissionToRequest) != PackageManager.PERMISSION_GRANTED) {
-            // Если разрешения нет, запрашиваем его
             ActivityCompat.requestPermissions(this, arrayOf(permissionToRequest), STORAGE_PERMISSION_REQUEST_CODE)
         } else {
-            // Если разрешение уже есть, сразу открываем галерею
             launchFilePicker()
         }
     }
 
     private fun launchFilePicker() {
         if (NetworkChecker.isNetworkAvailable(this)) {
-            filePickerLauncher.launch("image/*") // Уточняем, что ищем картинки
+            filePickerLauncher.launch("image/*")
         } else {
             Toast.makeText(this, "Прикрепление файлов доступно только онлайн", Toast.LENGTH_SHORT).show()
         }
@@ -141,10 +138,8 @@ class ChatActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == STORAGE_PERMISSION_REQUEST_CODE) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Если разрешение дали, открываем галерею
                 launchFilePicker()
             } else {
-                // Если отказали, показываем сообщение
                 Toast.makeText(this, "Нужно разрешение для доступа к файлам", Toast.LENGTH_SHORT).show()
             }
         }
@@ -197,51 +192,4 @@ class ChatActivity : AppCompatActivity() {
 
         db.collection("chats").document(chatRoomId!!)
             .collection("messages")
-            .add(message)
-            .addOnSuccessListener {
-                if (attachmentUrl == null) {
-                    messageEditText.setText("")
-                }
-            }
-    }
-
-    private fun sendMessageSms(messageText: String) {
-        val phoneNumber = receiverPhoneNumber
-        if (phoneNumber == null) {
-            Toast.makeText(this, "Не удалось найти номер телефона собеседника", Toast.LENGTH_LONG).show()
-            return
-        }
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
-            try {
-                val smsManager: SmsManager = SmsManager.getDefault()
-                smsManager.sendTextMessage(phoneNumber, null, messageText, null, null)
-                Toast.makeText(this, "Сообщение отправлено по SMS", Toast.LENGTH_LONG).show()
-                sendMessageFirestore(messageText, "sms")
-                messageEditText.setText("")
-            } catch (e: Exception) {
-                Toast.makeText(this, "Ошибка отправки SMS: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-        } else {
-            Toast.makeText(this, "Нет разрешения на отправку SMS", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun loadMessages() {
-        db.collection("chats").document(chatRoomId!!)
-            .collection("messages")
-            .orderBy("timestamp", Query.Direction.ASCENDING)
-            .addSnapshotListener { snapshots, error ->
-                if (error != null) { return@addSnapshotListener }
-                if (snapshots != null) {
-                    messageList.clear()
-                    for (doc in snapshots.documents) {
-                        val message = doc.toObject(Message::class.java)
-                        if (message != null) { messageList.add(message) }
-                    }
-                    messageAdapter.notifyDataSetChanged()
-                    chatRecyclerView.scrollToPosition(messageList.size - 1)
-                }
-            }
-    }
-}
+            .
