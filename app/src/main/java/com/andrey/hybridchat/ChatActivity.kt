@@ -155,41 +155,4 @@ class ChatActivity : AppCompatActivity() {
                 storageRef.downloadUrl.addOnSuccessListener { downloadUri ->
                     Toast.makeText(this, "Файл успешно загружен!", Toast.LENGTH_SHORT).show()
                     val fileUrl = downloadUri.toString()
-                    sendMessageFirestore("Фото", "firebase", fileUrl, "image")
-                }
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "Ошибка загрузки файла: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-    }
-
-    private fun fetchReceiverPhoneNumber(uid: String) {
-        db.collection("users").document(uid).get()
-            .addOnSuccessListener { document ->
-                if (document != null) {
-                    receiverPhoneNumber = document.getString("phoneNumber")
-                }
-            }
-    }
-
-    private fun sendMessage(messageText: String) {
-        if (NetworkChecker.isNetworkAvailable(this)) {
-            sendMessageFirestore(messageText, "firebase")
-        } else {
-            sendMessageSms(messageText)
-        }
-    }
-
-    private fun sendMessageFirestore(messageText: String, channel: String, attachmentUrl: String? = null, attachmentType: String? = null) {
-        val message = Message(
-            text = messageText,
-            senderId = senderUid,
-            timestamp = System.currentTimeMillis(),
-            channel = channel,
-            attachmentUrl = attachmentUrl,
-            attachmentType = attachmentType
-        )
-
-        db.collection("chats").document(chatRoomId!!)
-            .collection("messages")
-            .
+                    sendMessageFirestore("Фото", "firebase", fileUrl, "
