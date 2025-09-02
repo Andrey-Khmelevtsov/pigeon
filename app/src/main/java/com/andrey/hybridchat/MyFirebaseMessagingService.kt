@@ -1,5 +1,6 @@
 package com.andrey.hybridchat
 
+import android.content.Intent // <--- ВОТ СЮДА
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -18,9 +19,33 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
-        Log.d("FCM_MESSAGE", "Сообщение получено!")
-        Log.d("FCM_MESSAGE", "Данные: ${message.data}")
-        // TODO: Здесь будет основная логика обработки входящего звонка.
+
+        // Получаем данные, которые мы отправляли из нашей Cloud Function
+        val data = message.data
+        val type = data["type"]
+
+        Log.d("FCM_MESSAGE", "Получено сообщение типа: $type с данными: $data")
+
+        // Проверяем, что это именно уведомление о входящем звонке
+        if (type == "incoming_call") {
+            val senderName = data["sender_name"]
+            val channelName = data["channel_name"]
+
+            if (senderName != null && channelName != null) {
+                // Создаем намерение (Intent) открыть экран входящего звонка
+                val intent = Intent(this, CallActivity::class.java).apply {
+                    // Очень важно! Этот флаг нужен, чтобы запустить Activity из сервиса,
+                    // который работает в фоне.
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                    // Передаем на экран звонка все необходимые данные
+                    putExtra("IS_INCOMING_CALL", true) // Флаг, что это входящий, а не исходящий
+                    putExtra("USER_NAME", senderName)
+                    putExtra("CHANNEL_ID", channelName)
+                }
+                startActivity(intent)
+            }
+        }
     }
 
     // 👇 ФУНКЦИЯ, КОТОРУЮ Я ДОБАВИЛ 👇

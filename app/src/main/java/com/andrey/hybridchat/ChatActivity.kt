@@ -27,6 +27,7 @@ import com.andrey.hybridchat.utils.NetworkChecker
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.functions.ktx.functions
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.ktx.storage
 
@@ -47,6 +48,10 @@ class ChatActivity : AppCompatActivity() {
     private var chatRoomId: String? = null
     private val STORAGE_PERMISSION_REQUEST_CODE = 102
 
+    // <<< ДОБАВЛЕНЫ ПЕРЕМЕННЫЕ КЛАССА >>>
+    private var receiverName: String? = null
+    private val functions = Firebase.functions("europe-west1")
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
@@ -64,7 +69,8 @@ class ChatActivity : AppCompatActivity() {
         }
 
         receiverUid = intent.getStringExtra("USER_UID")
-        val receiverName = intent.getStringExtra("USER_NAME")
+        // <<< ИЗМЕНЕНО: убрал val, чтобы использовать переменную класса >>>
+        receiverName = intent.getStringExtra("USER_NAME")
         senderUid = auth.currentUser?.uid
         chatRoomId = listOfNotNull(senderUid, receiverUid).sorted().joinToString("_")
 
@@ -102,10 +108,46 @@ class ChatActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_call -> {
-                val intent = Intent(this, CallActivity::class.java)
-                intent.putExtra("CHANNEL_ID", chatRoomId)
-                intent.putExtra("USER_NAME", supportActionBar?.title)
+                // --- НАЧАЛО БЛОКА ДИАГНОСТИКИ ---
+                Log.d("CallDebug", "Нажата кнопка вызова.")
+                Log.d("CallDebug", "senderUid: $senderUid")
+                Log.d("CallDebug", "receiverUid: $receiverUid")
+                Log.d("CallDebug", "receiverName: $receiverName")
+                // --- КОНЕЦ БЛОКА ДИАГНОСТИКИ ---
+
+                // Проверяем, есть ли у нас все необходимые ID
+                if (senderUid == null || receiverUid == null) {
+                    Toast.makeText(this, "Ошибка: ID пользователя не найдены. Не могу позвонить.", Toast.LENGTH_LONG).show()
+                    Log.e("CallDebug", "Один из ID равен null, вызов функции отменен.")
+                    return true // Возвращаем true, чтобы система знала, что мы обработали нажатие
+                }
+
+                // 1. Создаем уникальное имя канала
+                val channelName = listOf(senderUid!!, receiverUid!!).sorted().joinToString("_")
+
+                // 2. Подготавливаем данные для отправки в Cloud Function
+                val data = hashMapOf(
+                    "recipientId" to receiverUid,
+                    "channelName" to channelName
+                )
+
+                // 3. Вызываем нашу Cloud Function
+                functions.getHttpsCallable("sendCallNotification")
+                    .call(data)
+                    .addOnSuccessListener {
+                        Log.d("CallDebug", "Cloud Function 'sendCallNotification' вызвана успешно.")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("CallDebug", "Ошибка при вызове Cloud Function", e)
+                    }
+
+                // 4. Сразу открываем экран звонка у себя
+                val intent = Intent(this, CallActivity::class.java).apply {
+                    putExtra("CHANNEL_ID", channelName)
+                    putExtra("USER_NAME", receiverName)
+                }
                 startActivity(intent)
+
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -184,6 +226,7 @@ class ChatActivity : AppCompatActivity() {
         val message = Message(
             text = messageText,
             senderId = senderUid,
+            // receiverId нужно будет добавить в модель, если его там нет
             timestamp = System.currentTimeMillis(),
             channel = channel,
             attachmentUrl = attachmentUrl,

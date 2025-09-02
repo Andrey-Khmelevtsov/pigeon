@@ -29,20 +29,33 @@ class CallActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_call)
 
+        // Получаем данные из Intent
+        val isIncomingCall = intent.getBooleanExtra("IS_INCOMING_CALL", false)
         channelName = intent.getStringExtra("CHANNEL_ID")
         val userName = intent.getStringExtra("USER_NAME")
 
         val callStatusTextView: TextView = findViewById(R.id.callStatusTextView)
         val hangUpButton: ImageButton = findViewById(R.id.hangUpButton)
 
-        callStatusTextView.text = "Звонок для\n$userName"
+        if (isIncomingCall) {
+            // Если это ВХОДЯЩИЙ звонок
+            callStatusTextView.text = "Входящий звонок от\n$userName"
+            // TODO: Здесь в будущем нужно будет показать кнопки "Принять/Отклонить" и включить рингтон
+        } else {
+            // Если это ИСХОДЯЩИЙ звонок (старая логика)
+            callStatusTextView.text = "Звонок для\n$userName"
+        }
 
         hangUpButton.setOnClickListener {
             leaveChannel()
         }
 
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO, PERMISSION_REQ_ID_RECORD_AUDIO)) {
-            initializeAndJoinChannel()
+        // Подключаемся к каналу, только если это ИСХОДЯЩИЙ звонок
+        // (для входящего нужно будет подключаться после нажатия кнопки "Принять")
+        if (!isIncomingCall) {
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO, PERMISSION_REQ_ID_RECORD_AUDIO)) {
+                initializeAndJoinChannel()
+            }
         }
     }
 
